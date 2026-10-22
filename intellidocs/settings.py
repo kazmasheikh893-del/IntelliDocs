@@ -25,7 +25,7 @@ if not SECRET_KEY:
         import secrets
         SECRET_KEY = secrets.token_urlsafe(50)
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.onrender.com,.railway.app').split(',') if h.strip()]
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.onrender.com,.railway.app,.lhr.life,.lhrtunnel.pro,.pinggy.link,.serveo.net,.serveousercontent.com').split(',') if h.strip()]
 
 # Auto-detect Render external hostname if running on Render
 RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
@@ -179,7 +179,7 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = _env_int('SECURE_HSTS_SECONDS', 3600)
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    _csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://*.onrender.com,https://*.railway.app')
+    _csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://*.onrender.com,https://*.railway.app,https://*.lhr.life,https://*.lhrtunnel.pro,https://*.pinggy.link,https://*.serveo.net,https://*.serveousercontent.com')
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
     if RENDER_EXTERNAL_HOSTNAME:
         render_origin = f"https://{RENDER_EXTERNAL_HOSTNAME}"

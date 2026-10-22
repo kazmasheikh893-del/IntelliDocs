@@ -44,3 +44,4 @@ class Command(BaseCommand):
             done += 1
             self.stdout.write(f"Re-embedded '{doc.title}' ({len(chunks)} chunks)")
         self.stdout.write(self.style.SUCCESS(f"Done. {done} document(s) re-embedded."))
+

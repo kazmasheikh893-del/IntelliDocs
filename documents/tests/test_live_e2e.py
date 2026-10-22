@@ -69,3 +69,4 @@ class LiveEndToEndTests(TestCase):
         out = ask("Who won the 1998 football World Cup final?")
         self.assertEqual(out["answer"], INSUFFICIENT_EVIDENCE_ANSWER)
         self.assertEqual(out["sources"], [])
+

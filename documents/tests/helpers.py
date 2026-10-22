@@ -73,3 +73,4 @@ class FakeEmbeddingService:
         if self.fail_with:
             raise self.fail_with
         return [self._vec(t) for t in texts]
+

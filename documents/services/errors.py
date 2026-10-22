@@ -83,3 +83,4 @@ def translate_exception(exc: Exception) -> GeminiError:
     if "Connect" in name or "Timeout" in name or isinstance(exc, (ConnectionError, TimeoutError)):
         return GeminiNetworkError()
     return GeminiError()
+

@@ -90,3 +90,4 @@ class IngestionTests(TestCase):
         first = doc.chunks.count()
         IngestionService.process_document(doc, embedding_service=svc)
         self.assertEqual(doc.chunks.count(), first)
+

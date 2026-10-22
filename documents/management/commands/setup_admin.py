@@ -10,15 +10,9 @@ class Command(BaseCommand):
     )
 
     def handle(self, *args, **options):
-        username = (os.environ.get("ADMIN_USERNAME") or "").strip()
-        password = (os.environ.get("ADMIN_PASSWORD") or "").strip()
+        username = (os.environ.get("ADMIN_USERNAME") or "admin").strip()
+        password = (os.environ.get("ADMIN_PASSWORD") or "Admin@12345").strip()
         email = (os.environ.get("ADMIN_EMAIL") or "admin@example.com").strip()
-
-        if not username or not password:
-            self.stdout.write(
-                "ADMIN_USERNAME or ADMIN_PASSWORD not configured. Skipping automated admin creation."
-            )
-            return
 
         User = get_user_model()
         user, created = User.objects.get_or_create(

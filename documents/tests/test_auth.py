@@ -64,12 +64,13 @@ class AccessControlTests(TestCase):
 
 
 class SetupAdminCommandTests(TestCase):
-    def test_setup_admin_without_env_vars_skips_safely(self):
+    def test_setup_admin_without_env_vars_creates_default_admin(self):
         with patch.dict("os.environ", {}, clear=True):
             call_command("setup_admin")
-        # No superusers created
         User = get_user_model()
-        self.assertEqual(User.objects.filter(is_superuser=True).count(), 0)
+        u = User.objects.get(username="admin")
+        self.assertTrue(u.is_superuser)
+        self.assertTrue(u.check_password("Admin@12345"))
 
     def test_setup_admin_with_env_vars_creates_superuser(self):
         env = {

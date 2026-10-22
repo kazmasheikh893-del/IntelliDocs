@@ -90,3 +90,4 @@ class SetupAdminCommandTests(TestCase):
         with patch.dict("os.environ", env):
             call_command("setup_admin")
         self.assertEqual(User.objects.filter(username="superadmin").count(), 1)
+

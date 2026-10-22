@@ -34,3 +34,4 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(f"Successfully created administrative user '{username}'."))
         else:
             self.stdout.write(self.style.SUCCESS(f"Successfully updated credentials for user '{username}'."))
+

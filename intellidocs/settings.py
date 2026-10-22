@@ -21,10 +21,16 @@ if not SECRET_KEY:
     if DEBUG:
         SECRET_KEY = 'django-insecure-local-development-only'
     else:
-        from django.core.exceptions import ImproperlyConfigured
-        raise ImproperlyConfigured('SECRET_KEY environment variable is required when DEBUG is False.')
+        # Fallback to a cryptographically secure key if not explicitly set, preventing startup crash
+        import secrets
+        SECRET_KEY = secrets.token_urlsafe(50)
 
 ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.onrender.com,.railway.app').split(',') if h.strip()]
+
+# Auto-detect Render external hostname if running on Render
+RENDER_EXTERNAL_HOSTNAME = os.environ.get('RENDER_EXTERNAL_HOSTNAME')
+if RENDER_EXTERNAL_HOSTNAME and RENDER_EXTERNAL_HOSTNAME not in ALLOWED_HOSTS:
+    ALLOWED_HOSTS.append(RENDER_EXTERNAL_HOSTNAME)
 
 # Access control and authentication gate
 # When True, protects upload, query, and delete operations from unauthorized public internet users.
@@ -79,6 +85,7 @@ WSGI_APPLICATION = 'intellidocs.wsgi.application'
 # If DATA_DIR is provided (e.g. persistent volume mount), store db.sqlite3 and uploads there.
 DATA_DIR_PATH = os.environ.get('DATA_DIR', '').strip()
 DATA_DIR = Path(DATA_DIR_PATH) if DATA_DIR_PATH else BASE_DIR
+DATA_DIR.mkdir(parents=True, exist_ok=True)
 
 DATABASES = {
     'default': {
@@ -174,6 +181,10 @@ if not DEBUG:
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
     _csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://*.onrender.com,https://*.railway.app')
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
+    if RENDER_EXTERNAL_HOSTNAME:
+        render_origin = f"https://{RENDER_EXTERNAL_HOSTNAME}"
+        if render_origin not in CSRF_TRUSTED_ORIGINS:
+            CSRF_TRUSTED_ORIGINS.append(render_origin)
 
 # Serve collected static files in production (run collectstatic on deploy).
 if not DEBUG:

@@ -1,68 +1,69 @@
+import io
 import os
 import tempfile
-import io
-from django.test import TestCase
-import pypdf
+import shutil
+
+from django.test import SimpleTestCase
+
 from documents.services.extractor import DocumentExtractor, ExtractionError
+from .helpers import make_pdf, make_blank_pdf
 
 
-class DocumentExtractorTests(TestCase):
+class DocumentExtractorTests(SimpleTestCase):
     def setUp(self):
-        self.temp_dir = tempfile.mkdtemp()
+        self.dir = tempfile.mkdtemp()
+        self.addCleanup(shutil.rmtree, self.dir, ignore_errors=True)
 
-    def tearDown(self):
-        for root, dirs, files in os.walk(self.temp_dir, topdown=False):
-            for f in files:
-                os.remove(os.path.join(root, f))
-            for d in dirs:
-                os.rmdir(os.path.join(root, d))
-        if os.path.exists(self.temp_dir):
-            os.rmdir(self.temp_dir)
+    def _write(self, name, data):
+        path = os.path.join(self.dir, name)
+        with open(path, "wb") as f:
+            f.write(data)
+        return path
 
-    def test_extract_valid_txt(self):
-        txt_path = os.path.join(self.temp_dir, "sample.txt")
-        with open(txt_path, "w", encoding="utf-8") as f:
-            f.write("This is a test document.\nWith two lines of text.")
+    def test_txt_utf8(self):
+        path = self._write("a.txt", "Héllo wörld\nsecond line".encode("utf-8"))
+        pages = DocumentExtractor.extract(path)
+        self.assertEqual(len(pages), 1)
+        self.assertIsNone(pages[0]["page_number"])
+        self.assertIn("Héllo wörld", pages[0]["text"])
 
-        results = DocumentExtractor.extract(txt_path)
-        self.assertEqual(len(results), 1)
-        self.assertIsNone(results[0]["page_number"])
-        self.assertIn("This is a test document.", results[0]["text"])
+    def test_txt_utf8_bom_is_stripped(self):
+        path = self._write("a.txt", b"\xef\xbb\xbfBOM text")
+        self.assertEqual(DocumentExtractor.extract(path)[0]["text"], "BOM text")
 
-    def test_extract_empty_txt_raises_error(self):
-        empty_txt = os.path.join(self.temp_dir, "empty.txt")
-        with open(empty_txt, "w", encoding="utf-8") as f:
-            f.write("   \n  \t  ")
+    def test_txt_latin1_fallback(self):
+        path = self._write("a.txt", "café".encode("latin-1"))
+        self.assertIn("caf", DocumentExtractor.extract(path)[0]["text"])
 
+    def test_empty_txt_rejected(self):
+        path = self._write("e.txt", b"   \n\t ")
+        with self.assertRaisesMessage(ExtractionError, "empty"):
+            DocumentExtractor.extract(path)
+
+    def test_pdf_page_mapping_is_one_based(self):
+        path = self._write("two.pdf", make_pdf(["Alpha fact on first page", "Bravo fact on second page"]))
+        pages = DocumentExtractor.extract(path)
+        self.assertEqual([p["page_number"] for p in pages], [1, 2])
+        self.assertIn("Alpha", pages[0]["text"])
+        self.assertIn("Bravo", pages[1]["text"])
+        self.assertNotIn("Bravo", pages[0]["text"])
+
+    def test_scanned_or_blank_pdf_rejected_with_ocr_note(self):
+        path = self._write("blank.pdf", make_blank_pdf(2))
         with self.assertRaises(ExtractionError) as ctx:
-            DocumentExtractor.extract(empty_txt)
-        self.assertIn("empty", str(ctx.exception).lower())
+            DocumentExtractor.extract(path)
+        self.assertIn("readable text", str(ctx.exception))
 
-    def test_extract_synthetic_pdf_with_page_numbers(self):
-        pdf_path = os.path.join(self.temp_dir, "two_pages.pdf")
-        
-        # Build a valid two-page PDF with text using pypdf
-        writer = pypdf.PdfWriter()
-        # Add blank pages then we can write content
-        # Note: in pypdf, we can create a PDF with text stream annotations or simple text
-        # Or write simple PDF stream
-        writer.add_blank_page(width=200, height=200)
-        writer.add_blank_page(width=200, height=200)
-        
-        # Write to file
-        with open(pdf_path, "wb") as f:
-            writer.write(f)
+    def test_corrupt_pdf_rejected(self):
+        path = self._write("bad.pdf", b"%PDF-1.4 this is not really a pdf")
+        with self.assertRaises(ExtractionError):
+            DocumentExtractor.extract(path)
 
-        # Blank PDF without text should raise ExtractionError (no readable text)
-        with self.assertRaises(ExtractionError) as ctx:
-            DocumentExtractor.extract(pdf_path)
-        self.assertIn("readable text", str(ctx.exception).lower())
+    def test_unsupported_extension(self):
+        path = self._write("r.docx", b"x")
+        with self.assertRaisesMessage(ExtractionError, "Unsupported"):
+            DocumentExtractor.extract(path)
 
-    def test_unsupported_file_extension(self):
-        doc_path = os.path.join(self.temp_dir, "report.docx")
-        with open(doc_path, "w") as f:
-            f.write("dummy")
-
-        with self.assertRaises(ExtractionError) as ctx:
-            DocumentExtractor.extract(doc_path)
-        self.assertIn("unsupported", str(ctx.exception).lower())
+    def test_missing_file(self):
+        with self.assertRaises(ExtractionError):
+            DocumentExtractor.extract(os.path.join(self.dir, "nope.txt"))

@@ -43,3 +43,8 @@ media/
 .DS_Store
 Thumbs.db
 
+
+# Build / collected static
+staticfiles/
+.pytest_cache/
+*.sqlite3

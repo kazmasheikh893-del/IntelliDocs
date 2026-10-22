@@ -1,70 +1,88 @@
-"""
-Embedding generation service using official Google Gemini API (google-genai SDK).
-Model: text-embedding-004
-"""
+"""Embedding generation via the official google-genai SDK."""
 
-import time
+import logging
 from typing import List, Optional
+
+import numpy as np
 from django.conf import settings
 from google import genai
-from google.genai.errors import APIError
+from google.genai import types
+
+from .errors import (  # noqa: F401  (re-exported for callers)
+    EmbeddingError,
+    MissingApiKeyError,
+    translate_exception,
+)
+
+logger = logging.getLogger(__name__)
+
+PLACEHOLDER_KEYS = {"", "your_gemini_api_key_here"}
+MAX_BATCH = 50
 
 
-class MissingApiKeyError(Exception):
-    """Raised when GEMINI_API_KEY is empty or not configured."""
-    pass
+def get_api_key() -> str:
+    key = (getattr(settings, "GEMINI_API_KEY", "") or "").strip()
+    if key in PLACEHOLDER_KEYS:
+        raise MissingApiKeyError()
+    return key
 
 
-class EmbeddingError(Exception):
-    """Raised when the embedding generation API request fails."""
-    pass
+def normalize(vec) -> List[float]:
+    arr = np.asarray(vec, dtype=np.float64)
+    norm = np.linalg.norm(arr)
+    if not np.isfinite(norm) or norm == 0:
+        raise EmbeddingError("The embedding model returned an unusable (zero or invalid) vector.")
+    return (arr / norm).tolist()
 
 
 class GeminiEmbeddingService:
-    """Provides methods to generate vector embeddings using Google GenAI SDK."""
+    """Creates L2-normalised embeddings with a fixed model and dimensionality."""
 
-    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None):
-        self.api_key = api_key or getattr(settings, "GEMINI_API_KEY", "")
-        if not self.api_key or self.api_key == "your_gemini_api_key_here":
-            raise MissingApiKeyError(
-                "GEMINI_API_KEY is not configured. Please add your real Gemini API key to .env"
-            )
-        self.model = model or getattr(settings, "GEMINI_EMBEDDING_MODEL", "text-embedding-004")
-        self._client = genai.Client(api_key=self.api_key)
+    def __init__(self, api_key: Optional[str] = None, model: Optional[str] = None,
+                 dimensions: Optional[int] = None):
+        key = (api_key or "").strip() or get_api_key()
+        if key in PLACEHOLDER_KEYS:
+            raise MissingApiKeyError()
+        self.model = model or settings.GEMINI_EMBEDDING_MODEL
+        self.dimensions = dimensions or settings.GEMINI_EMBEDDING_DIM
+        self._client = genai.Client(api_key=key)
 
     def embed_text(self, text: str) -> List[float]:
-        """Generates embedding for a single string."""
-        if not text.strip():
+        """Embed a user query."""
+        if not text or not text.strip():
             raise ValueError("Cannot generate embedding for empty text.")
-        batch_results = self.embed_batch([text])
-        return batch_results[0]
+        return self._embed([text], "RETRIEVAL_QUERY")[0]
 
-    def embed_batch(self, texts: List[str], batch_size: int = 32) -> List[List[float]]:
-        """
-        Generates embeddings for a batch of strings, splitting into smaller chunks
-        to respect API request payload limits.
-        """
-        if not texts:
-            return []
+    def embed_batch(self, texts: List[str]) -> List[List[float]]:
+        """Embed document chunks (in API-sized batches)."""
+        out: List[List[float]] = []
+        for i in range(0, len(texts), MAX_BATCH):
+            out.extend(self._embed(texts[i:i + MAX_BATCH], "RETRIEVAL_DOCUMENT"))
+        return out
 
-        all_embeddings: List[List[float]] = []
+    def _embed(self, texts: List[str], task_type: str) -> List[List[float]]:
+        try:
+            response = self._client.models.embed_content(
+                model=self.model,
+                contents=texts,
+                config=types.EmbedContentConfig(
+                    task_type=task_type,
+                    output_dimensionality=self.dimensions,
+                ),
+            )
+        except Exception as exc:  # translated to a safe, credential-free error
+            logger.warning("Embedding request failed: %s", type(exc).__name__)
+            raise translate_exception(exc) from None
 
-        for i in range(0, len(texts), batch_size):
-            chunk = texts[i : i + batch_size]
-            try:
-                response = self._client.models.embed_content(
-                    model=self.model,
-                    contents=chunk,
+        embeddings = response.embeddings or []
+        if len(embeddings) != len(texts):
+            raise EmbeddingError("The embedding API returned an unexpected number of vectors.")
+        vectors = []
+        for emb in embeddings:
+            values = list(emb.values or [])
+            if len(values) != self.dimensions:
+                raise EmbeddingError(
+                    f"Embedding dimension mismatch: expected {self.dimensions}, got {len(values)}."
                 )
-                if not response.embeddings:
-                    raise EmbeddingError("Gemini API returned an empty embedding response.")
-
-                for emb in response.embeddings:
-                    all_embeddings.append(list(emb.values))
-
-            except APIError as e:
-                raise EmbeddingError(f"Google Gemini API error during embedding generation: {e.message} (code: {e.code})")
-            except Exception as e:
-                raise EmbeddingError(f"Unexpected error communicating with Gemini API: {str(e)}")
-
-        return all_embeddings
+            vectors.append(normalize(values))
+        return vectors

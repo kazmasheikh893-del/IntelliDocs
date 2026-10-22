@@ -10,3 +10,4 @@ urlpatterns = [
     path("api/query/", views.query_api_view, name="api_query"),
     path("document/<int:document_id>/delete/", views.delete_document_view, name="delete"),
 ]
+

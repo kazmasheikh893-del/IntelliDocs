@@ -87,7 +87,7 @@ class DocumentExtractor:
 
     @classmethod
     def _extract_txt(cls, file_path: str) -> List[Dict[str, Any]]:
-        encodings = ["utf-8", "utf-8-sig", "latin-1", "cp1252"]
+        encodings = ["utf-8-sig", "utf-8", "latin-1", "cp1252"]
         content = None
 
         with open(file_path, "rb") as f:
@@ -111,3 +111,4 @@ class DocumentExtractor:
             "page_number": None,
             "text": cleaned_text
         }]
+

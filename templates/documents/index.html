@@ -3,6 +3,11 @@
 {% block title %}Documents & Ingestion | IntelliDocs{% endblock %}
 
 {% block content %}
+{% if not gemini_configured %}
+<div class="flash-message flash-warning" role="alert">
+    <span>GEMINI_API_KEY is not configured. Uploads will fail at the embedding step until you add it to your local <code>.env</code> and restart.</span>
+</div>
+{% endif %}
 <div class="dashboard-header">
     <div class="header-text">
         <h1>Document Repository</h1>
@@ -10,7 +15,7 @@
     </div>
     <div class="header-actions">
         <a href="{% url 'documents:qa' %}" class="btn btn-primary">
-            <span>💬 Launch Q&A Assistant</span>
+            <span>Open Q&amp;A Assistant</span>
         </a>
     </div>
 </div>
@@ -25,7 +30,11 @@
         <div class="stat-value text-success">{{ ready_docs }}</div>
     </div>
     <div class="stat-card">
-        <div class="stat-label">Vectorized Chunks</div>
+        <div class="stat-label">Failed</div>
+        <div class="stat-value">{{ failed_docs }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Indexed Passages</div>
         <div class="stat-value text-accent">{{ total_chunks }}</div>
     </div>
 </div>
@@ -40,9 +49,8 @@
         <form action="{% url 'documents:upload' %}" method="post" enctype="multipart/form-data" class="upload-form" id="documentUploadForm">
             {% csrf_token %}
             <div class="drop-zone" id="dropZone">
-                <div class="drop-zone-icon">📄</div>
-                <p class="drop-zone-prompt">Drag & drop your document here, or <span class="highlight">browse</span></p>
-                <p class="drop-zone-hint">Supports .pdf (page-aware text) and .txt (up to 10 MB)</p>
+                <label for="file-upload" class="drop-zone-prompt">Drag &amp; drop a document here, or <span class="highlight">browse</span></label>
+                <p class="drop-zone-hint">.pdf (text-based; scanned images are not supported &ndash; no OCR) or .txt, up to {{ max_upload_mb }} MB</p>
                 {{ upload_form.file }}
                 <div class="selected-file-preview" id="selectedFilePreview" style="display: none;">
                     <span id="selectedFileName"></span>
@@ -67,7 +75,7 @@
             <table class="data-table">
                 <thead>
                     <tr>
-                        <th>Document</th>
+                        <th scope="col">Document</th>
                         <th>Type</th>
                         <th>Pages</th>
                         <th>Chunks</th>
@@ -123,7 +131,6 @@
         </div>
         {% else %}
         <div class="empty-state">
-            <div class="empty-icon">📁</div>
             <h3>No documents uploaded yet</h3>
             <p>Upload a PDF or TXT document above to start asking questions grounded in its content.</p>
         </div>
@@ -131,3 +138,4 @@
     </section>
 </div>
 {% endblock %}
+

@@ -58,6 +58,15 @@ function initDropZone() {
             preview.style.display = "flex";
         }
     });
+
+    const uploadForm = document.getElementById("documentUploadForm");
+    const submitBtn = document.getElementById("uploadSubmitBtn");
+    if (uploadForm && submitBtn) {
+        uploadForm.addEventListener("submit", () => {
+            submitBtn.disabled = true;
+            submitBtn.textContent = "Processing\u2026 this can take a minute";
+        });
+    }
 }
 
 function formatBytes(bytes) {
@@ -83,7 +92,7 @@ function initQAForm() {
     questionInput.addEventListener("keydown", (e) => {
         if (e.key === "Enter" && !e.shiftKey) {
             e.preventDefault();
-            qaForm.dispatchEvent(new Event("submit"));
+            qaForm.requestSubmit();
         }
     });
 
@@ -109,7 +118,7 @@ function initQAForm() {
 
         try {
             const csrfToken = getCookie("csrftoken");
-            const response = await fetch("/api/query/", {
+            const response = await fetch(qaForm.dataset.queryUrl, {
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
@@ -121,12 +130,13 @@ function initQAForm() {
                 }),
             });
 
-            const data = await response.json();
+            let data = {};
+            try { data = await response.json(); } catch (_) { /* non-JSON error page */ }
 
             if (!response.ok) {
                 appendMessage({
                     role: "assistant",
-                    content: data.details || data.error || "An error occurred while contacting the Gemini API.",
+                    content: data.error || `The request failed (HTTP ${response.status}).`,
                     isError: true,
                 });
             } else {
@@ -207,9 +217,7 @@ function appendMessage({ role, content, grounded, sources, isError }) {
 
         card.innerHTML = `
             <div class="message-author">
-                <span class="bot-avatar">🤖</span>
                 <span class="author-name">IntelliDocs Assistant</span>
-                <span class="model-tag">Gemini 2.0 Flash</span>
             </div>
             <div class="message-body">
                 ${bodyHtml}
@@ -237,3 +245,4 @@ function formatMarkdownish(text) {
     safe = safe.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
     return safe;
 }
+

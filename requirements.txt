@@ -1,6 +1,7 @@
-Django>=5.1.0,<5.2.0
-python-dotenv>=1.0.1
-pypdf>=5.3.0
-numpy>=2.1.0
-google-genai>=1.0.0
-
+Django==5.1.15
+python-dotenv==1.2.4
+pypdf==6.21.2
+numpy==2.5.4
+google-genai==2.32.0
+whitenoise==6.9.0
+gunicorn==23.0.0; sys_platform != "win32"

@@ -124,3 +124,4 @@ class TextChunker:
                 refined_chunks.append(c)
 
         return refined_chunks
+

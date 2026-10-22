@@ -1,102 +1,87 @@
 """
-Django management command to test and verify official Google Gemini API connectivity.
-Usage: python manage.py verify_gemini
+Live connectivity check against the real Gemini API.
+
+    python manage.py verify_gemini
+
+Never prints the API key. Lists models available to the key, confirms the configured models
+support the required operations, then makes one real embedding and one real generation call.
 """
 
 import time
-from django.core.management.base import BaseCommand
+
 from django.conf import settings
+from django.core.management.base import BaseCommand
 from google import genai
-from google.genai.errors import APIError
+from google.genai import types
+
+from documents.services.embeddings import PLACEHOLDER_KEYS
+from documents.services.errors import translate_exception
+
+
+def _short(name: str) -> str:
+    return name.split("/", 1)[-1]
 
 
 class Command(BaseCommand):
-    help = "Verifies real connectivity, credentials, and model availability for the Google Gemini API."
+    help = "Verify Gemini credentials, configured models, and real embedding/generation calls."
 
     def handle(self, *args, **options):
-        self.stdout.write(self.style.NOTICE("==> Testing Google Gemini API Configuration..."))
-
-        api_key = getattr(settings, "GEMINI_API_KEY", "")
-        if not api_key:
-            self.stdout.write(
-                self.style.ERROR(
-                    "[FAIL] GEMINI_API_KEY is not set in your environment or .env file.\n"
-                    "-> Action required: Open .env and set GEMINI_API_KEY=your_key_here\n"
-                    "   You can obtain a free key from Google AI Studio: https://aistudio.google.com/"
-                )
-            )
+        key = (settings.GEMINI_API_KEY or "").strip()
+        if key in PLACEHOLDER_KEYS:
+            self.stdout.write(self.style.ERROR(
+                "[BLOCKED] GEMINI_API_KEY is not configured. Copy .env.example to .env and set "
+                "your key (https://aistudio.google.com/). Live verification NOT performed."))
             return
 
-        if api_key == "your_gemini_api_key_here":
-            self.stdout.write(
-                self.style.ERROR(
-                    "[FAIL] GEMINI_API_KEY contains the example placeholder value.\n"
-                    "-> Action required: Replace the placeholder in .env with your real Google Gemini API key."
-                )
-            )
-            return
+        client = genai.Client(api_key=key)
+        emb_model = settings.GEMINI_EMBEDDING_MODEL
+        gen_model = settings.GEMINI_GENERATION_MODEL
+        dim = settings.GEMINI_EMBEDDING_DIM
+        self.stdout.write("API key: configured (value hidden)")
 
-        # Obfuscate key in output
-        masked_key = f"{api_key[:6]}...{api_key[-4:]}" if len(api_key) > 10 else "***"
-        self.stdout.write(self.style.SUCCESS(f"[OK] Found GEMINI_API_KEY ({masked_key})"))
-
-        client = genai.Client(api_key=api_key)
-        embedding_model = getattr(settings, "GEMINI_EMBEDDING_MODEL", "text-embedding-004")
-        generation_model = getattr(settings, "GEMINI_GENERATION_MODEL", "gemini-2.0-flash")
-
-        # 1. Test Embedding Model
-        self.stdout.write(f"--> Testing Embedding Model: {embedding_model} ...")
-        start_time = time.time()
         try:
-            emb_resp = client.models.embed_content(
-                model=embedding_model,
-                contents="IntelliDocs RAG embedding connectivity test.",
-            )
-            elapsed = (time.time() - start_time) * 1000
-            if emb_resp.embeddings and len(emb_resp.embeddings[0].values) > 0:
-                dims = len(emb_resp.embeddings[0].values)
-                self.stdout.write(
-                    self.style.SUCCESS(
-                        f"[OK] Embedding SUCCESS ({dims} dimensions, latency: {elapsed:.1f}ms)"
-                    )
-                )
-            else:
-                self.stdout.write(self.style.WARNING("[WARN] Embedding returned empty values."))
-        except APIError as e:
-            self.stdout.write(
-                self.style.ERROR(f"[FAIL] Embedding API Error: {e.message} (HTTP code: {e.code})")
-            )
+            available = {_short(m.name): (m.supported_actions or []) for m in client.models.list()}
+        except Exception as exc:
+            self.stdout.write(self.style.ERROR(f"[FAIL] Could not list models: {translate_exception(exc).user_message}"))
             return
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"[FAIL] Embedding Unexpected Error: {str(e)}"))
-            return
+        self.stdout.write(f"Models visible to this key: {len(available)}")
 
-        # 2. Test Generation Model
-        self.stdout.write(f"--> Testing Generation Model: {generation_model} ...")
-        start_time = time.time()
+        for label, model, action in (("embedding", emb_model, "embedContent"),
+                                     ("generation", gen_model, "generateContent")):
+            actions = available.get(model)
+            if actions is None:
+                self.stdout.write(self.style.ERROR(f"[FAIL] {label} model '{model}' is not available to this key."))
+                suggestions = sorted(n for n, a in available.items() if action in a)[:15]
+                self.stdout.write(f"       Models supporting {action}: {', '.join(suggestions)}")
+                return
+            if action not in actions:
+                self.stdout.write(self.style.ERROR(f"[FAIL] '{model}' does not support {action}."))
+                return
+            self.stdout.write(self.style.SUCCESS(f"[OK] {label} model '{model}' supports {action}"))
+
         try:
-            gen_resp = client.models.generate_content(
-                model=generation_model,
-                contents="Reply with the single word: READY",
-            )
-            elapsed = (time.time() - start_time) * 1000
-            resp_text = (gen_resp.text or "").strip()
-            self.stdout.write(
-                self.style.SUCCESS(
-                    f"[OK] Generation SUCCESS (Response: '{resp_text}', latency: {elapsed:.1f}ms)"
-                )
-            )
-        except APIError as e:
-            self.stdout.write(
-                self.style.ERROR(f"[FAIL] Generation API Error: {e.message} (HTTP code: {e.code})")
-            )
-            return
-        except Exception as e:
-            self.stdout.write(self.style.ERROR(f"[FAIL] Generation Unexpected Error: {str(e)}"))
+            t = time.time()
+            r = client.models.embed_content(
+                model=emb_model, contents="IntelliDocs connectivity test.",
+                config=types.EmbedContentConfig(task_type="RETRIEVAL_QUERY", output_dimensionality=dim))
+            got = len(r.embeddings[0].values)
+            ok = got == dim
+            style = self.style.SUCCESS if ok else self.style.ERROR
+            self.stdout.write(style(f"[{'OK' if ok else 'FAIL'}] live embedding: {got} dims (expected {dim}), "
+                                    f"{(time.time() - t) * 1000:.0f} ms"))
+            if not ok:
+                return
+        except Exception as exc:
+            self.stdout.write(self.style.ERROR(f"[FAIL] live embedding: {translate_exception(exc).user_message}"))
             return
 
-        self.stdout.write(
-            self.style.SUCCESS(
-                "\n[SUCCESS] All Gemini API checks passed successfully! Your RAG assistant is ready."
-            )
-        )
+        try:
+            t = time.time()
+            r = client.models.generate_content(model=gen_model, contents="Reply with the single word: READY")
+            self.stdout.write(self.style.SUCCESS(
+                f"[OK] live generation returned text ({len(r.text or '')} chars), {(time.time() - t) * 1000:.0f} ms"))
+        except Exception as exc:
+            self.stdout.write(self.style.ERROR(f"[FAIL] live generation: {translate_exception(exc).user_message}"))
+            return
+
+        self.stdout.write(self.style.SUCCESS("All live Gemini checks passed."))

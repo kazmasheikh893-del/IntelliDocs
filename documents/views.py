@@ -1,12 +1,14 @@
 import json
 import logging
 import os
+from functools import wraps
 
 from django.conf import settings
 from django.contrib import messages
 from django.db.models import Sum
 from django.http import HttpRequest, HttpResponse, JsonResponse
 from django.shortcuts import get_object_or_404, redirect, render
+from django.urls import reverse
 from django.views.decorators.csrf import ensure_csrf_cookie
 from django.views.decorators.http import require_POST
 
@@ -20,11 +22,24 @@ from .services.ingestion import IngestionService
 logger = logging.getLogger(__name__)
 
 
+def auth_required(view_func):
+    """Enforces authentication only when settings.REQUIRE_AUTH is enabled."""
+    @wraps(view_func)
+    def _wrapped(request: HttpRequest, *args, **kwargs):
+        if getattr(settings, 'REQUIRE_AUTH', False) and not request.user.is_authenticated:
+            if request.headers.get('x-requested-with') == 'XMLHttpRequest' or (request.content_type or '').startswith('application/json'):
+                return JsonResponse({'error': 'Authentication required. Please log in.'}, status=401)
+            return redirect(f"{reverse('login')}?next={request.path}")
+        return view_func(request, *args, **kwargs)
+    return _wrapped
+
+
 def _gemini_configured() -> bool:
     return (getattr(settings, "GEMINI_API_KEY", "") or "").strip() not in PLACEHOLDER_KEYS
 
 
 @ensure_csrf_cookie
+@auth_required
 def index_view(request: HttpRequest) -> HttpResponse:
     """Dashboard: statistics are computed from persisted records."""
     documents = Document.objects.all()
@@ -42,6 +57,7 @@ def index_view(request: HttpRequest) -> HttpResponse:
 
 
 @require_POST
+@auth_required
 def upload_document_view(request: HttpRequest) -> HttpResponse:
     form = DocumentUploadForm(request.POST, request.FILES)
     if not form.is_valid():
@@ -70,6 +86,7 @@ def upload_document_view(request: HttpRequest) -> HttpResponse:
 
 
 @ensure_csrf_cookie
+@auth_required
 def qa_view(request: HttpRequest) -> HttpResponse:
     ready_documents = Document.objects.filter(status=Document.STATUS_READY)
     return render(request, "documents/chat.html", {
@@ -82,6 +99,7 @@ def qa_view(request: HttpRequest) -> HttpResponse:
 
 
 @require_POST
+@auth_required
 def query_api_view(request: HttpRequest) -> JsonResponse:
     """POST {"question": str, "document_id": int|null} -> {answer, grounded, sources}."""
     try:
@@ -129,6 +147,7 @@ def query_api_view(request: HttpRequest) -> JsonResponse:
 
 
 @require_POST
+@auth_required
 def delete_document_view(request: HttpRequest, document_id: int) -> HttpResponse:
     doc = get_object_or_404(Document, id=document_id)
     title = doc.title

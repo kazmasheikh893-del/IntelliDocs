@@ -25,6 +25,21 @@
                 <a href="{% url 'documents:qa' %}" class="nav-link {% if request.resolver_match.url_name == 'qa' %}active{% endif %}">
                     Q&A Assistant
                 </a>
+                {% if user.is_authenticated %}
+                <span class="nav-user" style="font-size: 0.85rem; color: var(--text-secondary); padding: 0.4rem 0.5rem;">
+                    👤 {{ user.username }}
+                </span>
+                <form method="post" action="{% url 'logout' %}" style="display: inline; margin: 0;">
+                    {% csrf_token %}
+                    <button type="submit" class="nav-link" style="background: none; border: none; cursor: pointer; color: var(--text-secondary); font-size: 0.85rem;">
+                        Log out
+                    </button>
+                </form>
+                {% else %}
+                <a href="{% url 'login' %}" class="nav-link {% if request.resolver_match.url_name == 'login' %}active{% endif %}">
+                    Sign In
+                </a>
+                {% endif %}
                 <a href="/admin/" target="_blank" class="nav-link admin-link">
                     Admin
                 </a>

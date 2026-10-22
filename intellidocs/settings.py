@@ -24,7 +24,14 @@ if not SECRET_KEY:
         from django.core.exceptions import ImproperlyConfigured
         raise ImproperlyConfigured('SECRET_KEY environment variable is required when DEBUG is False.')
 
-ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1').split(',') if h.strip()]
+ALLOWED_HOSTS = [h.strip() for h in os.environ.get('ALLOWED_HOSTS', 'localhost,127.0.0.1,.onrender.com,.railway.app').split(',') if h.strip()]
+
+# Access control and authentication gate
+# When True, protects upload, query, and delete operations from unauthorized public internet users.
+REQUIRE_AUTH = os.environ.get('REQUIRE_AUTH', 'False' if DEBUG else 'True').lower() in ('true', '1', 'yes')
+LOGIN_URL = 'login'
+LOGIN_REDIRECT_URL = 'documents:index'
+LOGOUT_REDIRECT_URL = 'login'
 
 # Application definition
 
@@ -68,10 +75,15 @@ TEMPLATES = [
 
 WSGI_APPLICATION = 'intellidocs.wsgi.application'
 
+# Database and persistent storage configuration
+# If DATA_DIR is provided (e.g. persistent volume mount), store db.sqlite3 and uploads there.
+DATA_DIR_PATH = os.environ.get('DATA_DIR', '').strip()
+DATA_DIR = Path(DATA_DIR_PATH) if DATA_DIR_PATH else BASE_DIR
+
 DATABASES = {
     'default': {
         'ENGINE': 'django.db.backends.sqlite3',
-        'NAME': BASE_DIR / 'db.sqlite3',
+        'NAME': DATA_DIR / 'db.sqlite3',
     }
 }
 
@@ -102,7 +114,8 @@ STATIC_URL = 'static/'
 STATICFILES_DIRS = [BASE_DIR / 'static']
 
 MEDIA_URL = '/media/'
-MEDIA_ROOT = BASE_DIR / 'media'
+MEDIA_ROOT = DATA_DIR / 'media'
+MEDIA_ROOT.mkdir(parents=True, exist_ok=True)
 
 DEFAULT_AUTO_FIELD = 'django.db.models.BigAutoField'
 
@@ -159,7 +172,7 @@ if not DEBUG:
     SECURE_HSTS_SECONDS = _env_int('SECURE_HSTS_SECONDS', 3600)
     SECURE_CONTENT_TYPE_NOSNIFF = True
     SECURE_PROXY_SSL_HEADER = ('HTTP_X_FORWARDED_PROTO', 'https')
-    _csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', '')
+    _csrf_origins = os.environ.get('CSRF_TRUSTED_ORIGINS', 'https://*.onrender.com,https://*.railway.app')
     CSRF_TRUSTED_ORIGINS = [o.strip() for o in _csrf_origins.split(',') if o.strip()]
 
 # Serve collected static files in production (run collectstatic on deploy).

@@ -81,7 +81,9 @@ class Command(BaseCommand):
             self.stdout.write(self.style.SUCCESS(
                 f"[OK] live generation returned text ({len(r.text or '')} chars), {(time.time() - t) * 1000:.0f} ms"))
         except Exception as exc:
-            self.stdout.write(self.style.ERROR(f"[FAIL] live generation: {translate_exception(exc).user_message}"))
+            code = getattr(exc, "code", None)
+            detail = f" (HTTP {code})" if code else ""
+            self.stdout.write(self.style.ERROR(f"[FAIL] live generation{detail}: {translate_exception(exc).user_message}"))
             return
 
         self.stdout.write(self.style.SUCCESS("All live Gemini checks passed."))

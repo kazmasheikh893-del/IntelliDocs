@@ -4,6 +4,7 @@ Preserves page-level metadata for PDFs.
 """
 
 import os
+import re
 from typing import List, Dict, Any, Optional
 import pypdf
 
@@ -41,6 +42,23 @@ class DocumentExtractor:
             raise ExtractionError(f"Unsupported file format: {ext}. Only .pdf and .txt are supported.")
 
     @classmethod
+    def _clean_text(cls, text: str) -> str:
+        """Cleans private-use characters, OCR font glitches, and normalizes spacing."""
+        if not text:
+            return ""
+        # 1. Replace private use Unicode characters (often bullet points in fonts) with standard bullet
+        t = re.sub(r"[\ue000-\uf8ff]", "• ", text)
+        # 2. Fix OCR glitch where letter 'l' or 'I' is glued immediately before a bit-width number (e.g. 'l8-bit' -> '8-bit')
+        t = re.sub(r"\b[lI](\d+)\s*[-–]?\s*bit\b", r"\1-bit", t, flags=re.IGNORECASE)
+        # 3. Clean null bytes or rogue non-printable control chars (preserve \n, \t, \r)
+        t = re.sub(r"[\x00-\x08\x0b\x0c\x0e-\x1f\x7f]", "", t)
+        # 4. Standardize CRLF to LF
+        t = t.replace("\r\n", "\n").replace("\r", "\n")
+        # 5. Clean trailing whitespace on lines
+        lines = [line.strip() for line in t.split("\n")]
+        return "\n".join(lines).strip()
+
+    @classmethod
     def _extract_pdf(cls, file_path: str) -> List[Dict[str, Any]]:
         pages_data: List[Dict[str, Any]] = []
 
@@ -65,10 +83,10 @@ class DocumentExtractor:
             page_num = idx + 1
             try:
                 raw_text = page.extract_text() or ""
-            except Exception as e:
+            except Exception:
                 raw_text = ""
             
-            cleaned_text = raw_text.strip()
+            cleaned_text = cls._clean_text(raw_text)
             if cleaned_text:
                 has_any_text = True
             
@@ -103,7 +121,7 @@ class DocumentExtractor:
         if content is None:
             raise ExtractionError("Unable to decode text file with standard encodings (UTF-8, Latin-1).")
 
-        cleaned_text = content.strip()
+        cleaned_text = cls._clean_text(content)
         if not cleaned_text:
             raise ExtractionError("The uploaded text file is empty.")
 
@@ -111,4 +129,3 @@ class DocumentExtractor:
             "page_number": None,
             "text": cleaned_text
         }]
-

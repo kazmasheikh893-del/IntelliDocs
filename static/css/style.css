@@ -629,6 +629,39 @@ body {
     font-size: 0.75rem;
 }
 
+.citation-pill {
+    display: inline-flex;
+    align-items: center;
+    gap: 0.25rem;
+    background: rgba(56, 189, 248, 0.12);
+    color: var(--accent);
+    border: 1px solid rgba(56, 189, 248, 0.35);
+    border-radius: 9999px;
+    padding: 2px 9px;
+    font-size: 0.78rem;
+    font-weight: 600;
+    margin: 0 3px;
+    vertical-align: baseline;
+    letter-spacing: 0.01em;
+    white-space: normal;
+    word-break: break-word;
+}
+
+.citation-pill:hover {
+    background: rgba(56, 189, 248, 0.22);
+    border-color: var(--accent);
+}
+
+.md-heading {
+    color: var(--accent);
+    margin-top: 1rem;
+    margin-bottom: 0.4rem;
+    font-size: 1.05rem;
+    font-weight: 700;
+    border-bottom: 1px solid rgba(56, 189, 248, 0.15);
+    padding-bottom: 0.2rem;
+}
+
 .source-excerpt {
     color: var(--text-secondary);
     font-style: italic;

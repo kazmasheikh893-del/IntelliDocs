@@ -9,13 +9,16 @@ official Google Gemini API **only from passages retrieved from your documents**,
 ## How RAG works here
 
 1. **Upload & validate** – extension, size (default 10 MB), file signature (`%PDF-`), empty/binary checks, duplicate detection (SHA-256).
-2. **Extract** – `pypdf` reads PDFs page by page (1-based page numbers kept); TXT is decoded (UTF-8/BOM, Latin-1/cp1252 fallback).
+2. **Extract** – `pypdf` reads PDFs page by page (1-based page numbers kept); sanitizes OCR ligatures and private-use characters; TXT is decoded (UTF-8/BOM, Latin-1/cp1252 fallback).
 3. **Chunk** – overlapping chunks (default 800 chars / 100 overlap) that never cross a page boundary, each tagged with document + page.
 4. **Embed** – `gemini-embedding-001` (768 dims, L2-normalised). Each chunk stores the model name and dimension.
 5. **Store** – Django ORM (SQLite) + NumPy. Chunks and the "ready" status are written in one transaction; failures leave no partial data.
-6. **Ask** – question embedded → cosine similarity over chunks of *ready* documents (optionally one document) → top-k above a threshold.
-7. **Generate** – Gemini gets only those passages, fenced as untrusted data, and returns structured JSON (`answerable`, `answer`, snippet numbers).
-8. **Cite** – the app validates snippet numbers against what was actually retrieved and builds filename/page citations itself. Invented references are discarded; an answer with no valid citation becomes the fallback.
+6. **Query Analysis & Intent Routing** – `QueryAnalyzer` classifies queries into document-wide summary, definition (with simple-words flag), comparison, page-specific, or standard factual questions.
+7. **Document-Wide Summaries** – `DocumentSummarizer` synthesizes entire documents across all pages without narrow top-k truncation, structured with headings, specifications, core definitions, and page coverage.
+8. **Ask & Context Expansion** – question embedded → cosine similarity over chunks of *ready* documents → top-k above threshold with adjacent context window expansion for complete technical definitions.
+9. **Generate** – Gemini gets retrieved passages, fenced as untrusted data, and returns structured JSON (`answerable`, `answer`, snippet numbers).
+10. **Cite & Format** – the app validates snippet numbers against retrieved chunks and builds readable citations (`[Source: <filename> — Page <N>]`), rendered as interactive pills in the UI. Invented references are discarded; answers without valid citations return the exact fallback.
+11. **Developer Diagnostics** – When `DEBUG=True`, queries return safe execution diagnostics (`intent`, `model`, `strategy`, `elapsed_seconds`, `sources_cited`) without exposing keys or raw vectors.
 
 A similarity threshold alone is not treated as proof of an answer: the model must also state the evidence supports it.
 
@@ -44,7 +47,7 @@ Open <http://127.0.0.1:8000/>. Edit `.env` in an editor; do not print or share i
 
 Lists the models your key can use, confirms the configured embedding/generation models support `embedContent`/`generateContent`, then makes one real embedding and one real generation call. The key is never printed. Without a key it reports `BLOCKED` and performs nothing.
 
-`text-embedding-004` has been retired by Google, so the default is `gemini-embedding-001`; the generation default is `gemini-2.5-flash`. Model availability changes — if `verify_gemini` reports a model missing, set `GEMINI_EMBEDDING_MODEL` / `GEMINI_GENERATION_MODEL` in `.env` to one it lists.
+`text-embedding-004` has been retired by Google, and `gemini-2.5-flash` is no longer available to new users, so the defaults are `gemini-embedding-001` and `gemini-3.5-flash-lite`. Model availability changes — if `verify_gemini` reports a model missing or unavailable, set `GEMINI_EMBEDDING_MODEL` / `GEMINI_GENERATION_MODEL` in `.env` to a supported model.
 
 **Changing the embedding model or dimension:** old vectors are incompatible. The app detects this (questions return a clear error instead of mixing vectors). Rebuild with:
 

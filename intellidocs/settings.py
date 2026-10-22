@@ -130,7 +130,7 @@ GEMINI_API_KEY = os.environ.get('GEMINI_API_KEY', '').strip()
 # text-embedding-004 was retired by Google; gemini-embedding-001 is its supported successor.
 GEMINI_EMBEDDING_MODEL = os.environ.get('GEMINI_EMBEDDING_MODEL', 'gemini-embedding-001')
 GEMINI_EMBEDDING_DIM = _env_int('GEMINI_EMBEDDING_DIM', 768)
-GEMINI_GENERATION_MODEL = os.environ.get('GEMINI_GENERATION_MODEL', 'gemini-2.5-flash')
+GEMINI_GENERATION_MODEL = os.environ.get('GEMINI_GENERATION_MODEL', 'gemini-3.5-flash-lite')
 
 # --- Retrieval / chunking parameters --------------------------------------------
 RAG_TOP_K = _env_int('RAG_TOP_K', 5)

@@ -239,10 +239,27 @@ function escapeHtml(text) {
 function formatMarkdownish(text) {
     if (!text) return "";
     let safe = escapeHtml(text);
-    // Replace newlines with <br>
-    safe = safe.replace(/\n/g, "<br>");
+    
+    // Headings ### Heading
+    safe = safe.replace(/^###\s+(.*?)$/gm, '<h4 class="md-heading">$1</h4>');
+    safe = safe.replace(/^##\s+(.*?)$/gm, '<h3 class="md-heading">$1</h3>');
+
     // Bold **text**
     safe = safe.replace(/\*\*(.*?)\*\*/g, "<strong>$1</strong>");
+
+    // Inline code `code`
+    safe = safe.replace(/`([^`]+)`/g, '<code style="background: rgba(255,255,255,0.08); padding: 1px 5px; border-radius: 3px; font-size: 0.9em;">$1</code>');
+
+    // Bullet points (- or * at start of line)
+    safe = safe.replace(/^[\*\-]\s+(.*?)$/gm, '<span style="display: inline-block; margin-left: 0.5rem;">• $1</span><br>');
+
+    // Citation pill: [Source: ...]
+    safe = safe.replace(/\[Source:\s*([^\]]+)\]/g, '<span class="citation-pill"><span aria-hidden="true">📄</span> Source: $1</span>');
+
+    // Replace remaining double newlines and single newlines
+    safe = safe.replace(/\n\n+/g, "<br><br>");
+    safe = safe.replace(/\n/g, "<br>");
+    
     return safe;
 }
 

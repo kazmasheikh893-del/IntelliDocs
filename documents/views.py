@@ -116,12 +116,16 @@ def query_api_view(request: HttpRequest) -> JsonResponse:
         logger.exception("Unexpected error while answering a question")
         return JsonResponse({"error": "An unexpected error occurred. Please try again."}, status=500)
 
-    return JsonResponse({
+    response_data = {
         "question": result.question,
         "answer": result.answer,
         "grounded": result.grounded,
         "sources": result.sources,
-    })
+    }
+    if settings.DEBUG and result.diagnostics:
+        response_data["diagnostics"] = result.diagnostics
+
+    return JsonResponse(response_data)
 
 
 @require_POST

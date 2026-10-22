@@ -45,7 +45,7 @@ class GroundedQATests(TestCase):
         r = self.svc().answer_question("What is the warranty period?")
         self.assertTrue(r.grounded)
         self.assertIn("24 months", r.answer)
-        self.assertIn("[Policy.pdf, p. 3]", r.answer)
+        self.assertIn("[Source: Policy.pdf — Page 3]", r.answer)
         self.assertNotIn("[S1]", r.answer)
         self.assertEqual(len(r.sources), 1)
         self.assertEqual(r.sources[0]["document_title"], "Policy.pdf")

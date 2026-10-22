@@ -1,0 +1,58 @@
+{% load static %}
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>{% block title %}IntelliDocs | AI Document Intelligence Assistant{% endblock %}</title>
+    <link rel="stylesheet" href="{% static 'css/style.css' %}">
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Fira+Code:wght@400;500&display=swap" rel="stylesheet">
+</head>
+<body>
+    <header class="navbar">
+        <div class="nav-container">
+            <a href="{% url 'documents:index' %}" class="brand">
+                <span class="brand-icon">⚡</span>
+                <span class="brand-title">IntelliDocs</span>
+                <span class="brand-badge">RAG + Gemini</span>
+            </a>
+            <nav class="nav-links">
+                <a href="{% url 'documents:index' %}" class="nav-link {% if request.resolver_match.url_name == 'index' %}active{% endif %}">
+                    Documents
+                </a>
+                <a href="{% url 'documents:qa' %}" class="nav-link {% if request.resolver_match.url_name == 'qa' %}active{% endif %}">
+                    Q&A Assistant
+                </a>
+                <a href="/admin/" target="_blank" class="nav-link admin-link">
+                    Admin
+                </a>
+            </nav>
+        </div>
+    </header>
+
+    <main class="main-content">
+        {% if messages %}
+        <div class="flash-messages">
+            {% for message in messages %}
+            <div class="flash-message flash-{{ message.tags }}">
+                <span>{{ message }}</span>
+                <button type="button" class="flash-close" onclick="this.parentElement.remove();">&times;</button>
+            </div>
+            {% endfor %}
+        </div>
+        {% endif %}
+
+        {% block content %}{% endblock %}
+    </main>
+
+    <footer class="footer">
+        <div class="footer-container">
+            <p>IntelliDocs &bull; AI-Powered Document Intelligence Assistant using Django, RAG & Google Gemini API</p>
+        </div>
+    </footer>
+
+    <script src="{% static 'js/app.js' %}"></script>
+</body>
+</html>

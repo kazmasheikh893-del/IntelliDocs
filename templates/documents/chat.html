@@ -1,0 +1,79 @@
+{% extends 'base.html' %}
+
+{% block title %}Q&A Assistant | IntelliDocs{% endblock %}
+
+{% block content %}
+<div class="chat-container">
+    <div class="chat-sidebar">
+        <div class="sidebar-section">
+            <h3>Document Filter</h3>
+            <p class="sidebar-help">Select a specific document or search across all vectorized documents in the repository.</p>
+            <div class="form-group">
+                <select id="docFilterSelect" class="form-select">
+                    <option value="">All Indexed Documents</option>
+                    {% for doc in documents %}
+                    <option value="{{ doc.id }}" {% if request.GET.doc == doc.id|stringformat:"i" %}selected{% endif %}>
+                        {{ doc.title }} ({{ doc.page_count }} {% if doc.file_type == 'pdf' %}pages{% else %}text{% endif %})
+                    </option>
+                    {% endfor %}
+                </select>
+            </div>
+        </div>
+
+        <div class="sidebar-section">
+            <h3>Grounding Rules</h3>
+            <ul class="grounding-rules-list">
+                <li><span>✔</span> Context retrieved via vector similarity</li>
+                <li><span>✔</span> Real Google Gemini API generation</li>
+                <li><span>✔</span> Page number citations for PDFs</li>
+                <li><span>✔</span> Deterministic fallback if evidence is insufficient</li>
+                <li><span>✔</span> Zero mocked or fabricated answers</li>
+            </ul>
+        </div>
+
+        <div class="sidebar-section">
+            <a href="{% url 'documents:index' %}" class="btn btn-outline btn-block">
+                <span>&larr; Manage Documents</span>
+            </a>
+        </div>
+    </div>
+
+    <div class="chat-main">
+        <div class="chat-feed" id="chatFeed">
+            <!-- Welcome message -->
+            <div class="message-card assistant-card">
+                <div class="message-author">
+                    <span class="bot-avatar">🤖</span>
+                    <span class="author-name">IntelliDocs Assistant</span>
+                    <span class="model-tag">Gemini 2.0 Flash</span>
+                </div>
+                <div class="message-body">
+                    <p>Welcome! Ask any question about your uploaded documents. Answers will be generated strictly from retrieved document excerpts and will include exact page references where available.</p>
+                </div>
+            </div>
+        </div>
+
+        <!-- Progress Indicator -->
+        <div class="query-progress" id="queryProgress" style="display: none;">
+            <div class="spinner"></div>
+            <span id="progressText">Embedding query and searching passages...</span>
+        </div>
+
+        <!-- Question Input Bar -->
+        <div class="chat-input-container">
+            <form id="qaForm" class="qa-form">
+                {% csrf_token %}
+                <textarea 
+                    id="questionInput" 
+                    rows="2" 
+                    placeholder="Ask a question about your document (e.g. 'What are the main findings in section 3?')..."
+                    required
+                ></textarea>
+                <button type="submit" class="btn btn-primary btn-send" id="sendBtn">
+                    <span>Ask Gemini</span>
+                </button>
+            </form>
+        </div>
+    </div>
+</div>
+{% endblock %}

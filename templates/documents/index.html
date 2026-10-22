@@ -1,0 +1,133 @@
+{% extends 'base.html' %}
+
+{% block title %}Documents & Ingestion | IntelliDocs{% endblock %}
+
+{% block content %}
+<div class="dashboard-header">
+    <div class="header-text">
+        <h1>Document Repository</h1>
+        <p>Upload PDF and TXT documents. Text is automatically parsed, split into page-aware chunks, embedded, and indexed for semantic vector search.</p>
+    </div>
+    <div class="header-actions">
+        <a href="{% url 'documents:qa' %}" class="btn btn-primary">
+            <span>💬 Launch Q&A Assistant</span>
+        </a>
+    </div>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">Total Documents</div>
+        <div class="stat-value">{{ total_docs }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Indexed & Ready</div>
+        <div class="stat-value text-success">{{ ready_docs }}</div>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">Vectorized Chunks</div>
+        <div class="stat-value text-accent">{{ total_chunks }}</div>
+    </div>
+</div>
+
+<div class="content-split">
+    <!-- Upload Section -->
+    <section class="card upload-card">
+        <div class="card-header">
+            <h2>Upload Document</h2>
+            <span class="badge">PDF / TXT</span>
+        </div>
+        <form action="{% url 'documents:upload' %}" method="post" enctype="multipart/form-data" class="upload-form" id="documentUploadForm">
+            {% csrf_token %}
+            <div class="drop-zone" id="dropZone">
+                <div class="drop-zone-icon">📄</div>
+                <p class="drop-zone-prompt">Drag & drop your document here, or <span class="highlight">browse</span></p>
+                <p class="drop-zone-hint">Supports .pdf (page-aware text) and .txt (up to 10 MB)</p>
+                {{ upload_form.file }}
+                <div class="selected-file-preview" id="selectedFilePreview" style="display: none;">
+                    <span id="selectedFileName"></span>
+                    <span id="selectedFileSize" class="file-size-tag"></span>
+                </div>
+            </div>
+            <button type="submit" class="btn btn-primary btn-block" id="uploadSubmitBtn">
+                <span>Upload & Ingest Document</span>
+            </button>
+        </form>
+    </section>
+
+    <!-- Documents List Section -->
+    <section class="card table-card">
+        <div class="card-header">
+            <h2>Active Documents</h2>
+            <span class="subtext">{{ documents|length }} items</span>
+        </div>
+
+        {% if documents %}
+        <div class="table-responsive">
+            <table class="data-table">
+                <thead>
+                    <tr>
+                        <th>Document</th>
+                        <th>Type</th>
+                        <th>Pages</th>
+                        <th>Chunks</th>
+                        <th>Status</th>
+                        <th>Actions</th>
+                    </tr>
+                </thead>
+                <tbody>
+                    {% for doc in documents %}
+                    <tr>
+                        <td class="doc-title-cell">
+                            <strong>{{ doc.title }}</strong>
+                            <span class="doc-meta">Uploaded {{ doc.created_at|date:"M d, H:i" }} &bull; {{ doc.file_size|filesizeformat }}</span>
+                            {% if doc.error_message %}
+                            <div class="error-notice">{{ doc.error_message }}</div>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <span class="type-pill type-{{ doc.file_type }}">{{ doc.file_type|upper }}</span>
+                        </td>
+                        <td>{{ doc.page_count }}</td>
+                        <td><strong>{{ doc.total_chunks }}</strong></td>
+                        <td>
+                            {% if doc.status == 'ready' %}
+                            <span class="status-badge status-ready">Ready</span>
+                            {% elif doc.status == 'processing' %}
+                            <span class="status-badge status-processing">Processing</span>
+                            {% elif doc.status == 'failed' %}
+                            <span class="status-badge status-failed">Failed</span>
+                            {% else %}
+                            <span class="status-badge status-pending">Pending</span>
+                            {% endif %}
+                        </td>
+                        <td>
+                            <div class="action-buttons">
+                                {% if doc.status == 'ready' %}
+                                <a href="{% url 'documents:qa' %}?doc={{ doc.id }}" class="btn btn-sm btn-outline" title="Ask question about this document">
+                                    Ask
+                                </a>
+                                {% endif %}
+                                <form action="{% url 'documents:delete' doc.id %}" method="post" onsubmit="return confirm('Delete document and all related vector chunks?');" style="display: inline;">
+                                    {% csrf_token %}
+                                    <button type="submit" class="btn btn-sm btn-danger-outline" title="Delete document">
+                                        Delete
+                                    </button>
+                                </form>
+                            </div>
+                        </td>
+                    </tr>
+                    {% endfor %}
+                </tbody>
+            </table>
+        </div>
+        {% else %}
+        <div class="empty-state">
+            <div class="empty-icon">📁</div>
+            <h3>No documents uploaded yet</h3>
+            <p>Upload a PDF or TXT document above to start asking questions grounded in its content.</p>
+        </div>
+        {% endif %}
+    </section>
+</div>
+{% endblock %}

@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: intellidocs-ai
+    runtime: python
+    buildCommand: "./build.sh"
+    startCommand: "gunicorn intellidocs.wsgi:application --bind 0.0.0.0:$PORT --workers 2 --timeout 120"
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.0
+      - key: SECRET_KEY
+        generateValue: true
+      - key: DEBUG
+        value: "False"
+      - key: GEMINI_API_KEY
+        sync: false
+      - key: GEMINI_EMBEDDING_MODEL
+        value: "gemini-embedding-001"
+      - key: GEMINI_GENERATION_MODEL
+        value: "gemini-3.5-flash-lite"
+      - key: ALLOWED_HOSTS
+        value: ".onrender.com"
+      - key: CSRF_TRUSTED_ORIGINS
+        value: "https://*.onrender.com"
+
